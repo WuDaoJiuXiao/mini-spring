@@ -1,7 +1,8 @@
 package com.jiuxiao.ioc;
 
-import com.jiuxiao.ioc.reslover.ResourceResolver;
-import org.junit.Test;
+import com.jiuxiao.ioc.io.Resource;
+import com.jiuxiao.ioc.io.ResourceResolver;
+import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
@@ -13,10 +14,18 @@ import java.util.List;
 public class IOCTest {
 
     @Test
-    public void testResourceResolverForFindClass() throws Exception {
+    public void testResourceResolverForFindClass() {
         String packageName = "com.jiuxiao";
+        boolean scanJar = true;
         ResourceResolver resolver = new ResourceResolver(packageName);
-        List<String> classList = resolver.findClass();
+        List<Resource> classList = resolver.findClass(resource -> {
+            String name = resource.getName();
+            String path = resource.getPath();
+            if (name != null && path != null){
+                return resource;
+            }
+            return null;
+        }, scanJar);
         classList.forEach(System.out::println);
     }
 }

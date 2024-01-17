@@ -1,6 +1,7 @@
-package com.jiuxiao.ioc.reslover;
+package com.jiuxiao.ioc.io;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -13,6 +14,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
+import java.util.function.Function;
 import java.util.jar.JarFile;
 
 /**
@@ -24,8 +26,6 @@ public class ResourceResolver {
 
     private String basePackage;
 
-    private final List<String> clazzList = new ArrayList<>();
-
     public ResourceResolver(String basePackage) {
         this.basePackage = basePackage;
     }
@@ -35,20 +35,27 @@ public class ResourceResolver {
      * @description 从指定包下及其 jars 中扫描并返回所有的 class 文件的全限定名
      * @date 2024/1/15 14:12
      */
-    public List<String> findClass() throws IOException, URISyntaxException {
+    public <R> List<R> findClass(Function<Resource, R> mapper, boolean scanJar) {
         basePackage = basePackage.replace(".", "/");
-        Enumeration<URL> resources = getClassLoader().getResources(basePackage);
-        if (resources.hasMoreElements()) {
-            URL url = resources.nextElement();
-            URI uri = url.toURI();
-            String uriStr = removeSuffixSlash(uri2String(uri));
-            String parentUri = uriStr.substring(0, uriStr.length() - basePackage.length());
-            if (parentUri.startsWith("file:")) {
-                parentUri = parentUri.substring(6);
-                scanClass(parentUri);
+        ArrayList<R> clazzList = new ArrayList<>();
+        try {
+            Enumeration<URL> resources = getClassLoader().getResources(basePackage);
+            if (resources.hasMoreElements()) {
+                URL url = resources.nextElement();
+                URI uri = url.toURI();
+                String uriStr = removeSuffixSlash(uri2String(uri));
+                String parentUri = uriStr.substring(0, uriStr.length() - basePackage.length());
+                if (parentUri.startsWith("file:")) {
+                    parentUri = parentUri.substring(6);
+                    scanClass(parentUri, mapper, clazzList, scanJar);
+                }
             }
+            return clazzList;
+        } catch (IOException ioe) {
+            throw new UncheckedIOException(ioe);
+        } catch (URISyntaxException ue) {
+            throw new RuntimeException(ue);
         }
-        return clazzList;
     }
 
     /**
@@ -57,7 +64,7 @@ public class ResourceResolver {
      * @description 扫描包路径下、jar包下的 class 文件并添加到结果集合
      * @date 2024/1/15 15:58
      */
-    private void scanClass(String parent) throws IOException {
+    private <R> void scanClass(String parent, Function<Resource, R> mapper, ArrayList<R> clazzList, boolean scanJar) throws IOException {
         parent = removeSuffixSlash(parent);
         parent = removePrefixSlash(parent);
         Path rootDir = Paths.get(parent);
@@ -72,10 +79,27 @@ public class ResourceResolver {
                 String pkgSlashName = absPath.substring(finalParent.length() + 1);
                 String pkgDotName = slash2Dot(pkgSlashName);
                 String filePath = pkgDotName.substring(0, pkgDotName.length() - 6);
-                clazzList.add(filePath);
-            }else if (suffixName.equals("jar")) {
-                List<String> jarClass = readJarFileForClass(absPath);
-                clazzList.addAll(jarClass);
+                String fileName = filePath.substring(filePath.lastIndexOf(".") + 1);
+                Resource resource = new Resource(fileName, filePath);
+                R r = mapper.apply(resource);
+                if (r != null) {
+                    clazzList.add(r);
+                }
+            } else if (suffixName.equals("jar") && scanJar) {
+                List<String> jarClass;
+                try {
+                    jarClass = readJarFileForClass(absPath);
+                } catch (IOException e) {
+                    throw new RuntimeException(e);
+                }
+                jarClass.forEach(clazzPath -> {
+                    String clazzName = clazzPath.substring(clazzPath.lastIndexOf(".") + 1);
+                    Resource resource = new Resource(clazzName, clazzPath);
+                    R r = mapper.apply(resource);
+                    if (r != null) {
+                        clazzList.add(r);
+                    }
+                });
             }
         });
     }
@@ -86,23 +110,19 @@ public class ResourceResolver {
      * @description 读取 jar 包中的 class 文件，收集全限定名
      * @date 2024/1/16 14:20
      */
-    private List<String> readJarFileForClass(String absPath) {
+    private List<String> readJarFileForClass(String absPath) throws IOException {
         JarFile jarFile;
         List<String> resClass = new ArrayList<>();
-        try {
-            jarFile = new JarFile(absPath);
-            jarFile.stream().forEach(res -> {
-                String resAbsPath = res.toString();
-                if (resAbsPath.endsWith(".class") && !resAbsPath.contains("$")) {
-                    String doted = slash2Dot(resAbsPath);
-                    String filePath = doted.substring(0, doted.length() - 6);
-                    resClass.add(filePath);
-                }
-            });
-            jarFile.close();
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
+        jarFile = new JarFile(absPath);
+        jarFile.stream().forEach(res -> {
+            String resAbsPath = res.toString();
+            if (resAbsPath.endsWith(".class")) {
+                String doted = slash2Dot(resAbsPath);
+                String filePath = doted.substring(0, doted.length() - 6);
+                resClass.add(filePath);
+            }
+        });
+        jarFile.close();
         return resClass;
     }
 
@@ -111,7 +131,7 @@ public class ResourceResolver {
      * @description 获取资源加载器实例
      * @date 2024/1/15 14:52
      */
-    private ClassLoader getClassLoader(){
+    private ClassLoader getClassLoader() {
         ClassLoader loader = Thread.currentThread().getContextClassLoader();
         if (loader == null) {
             loader = getClass().getClassLoader();
@@ -125,7 +145,7 @@ public class ResourceResolver {
      * @description 将文件路径中的斜杠替换为点
      * @date 2024/1/15 17:03
      */
-    private String slash2Dot(String s){
+    private String slash2Dot(String s) {
         s = s.replace("\\", ".");
         s = s.replace("/", ".");
         return s;
@@ -148,7 +168,7 @@ public class ResourceResolver {
      * @date 2024/1/15 14:59
      */
     private String removePrefixSlash(String path) {
-        if (path.startsWith("/") || path.startsWith("\\")){
+        if (path.startsWith("/") || path.startsWith("\\")) {
             path = path.substring(1);
         }
         return path;
