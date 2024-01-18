@@ -31,9 +31,11 @@ public class ResourceResolver {
     }
 
     /**
-     * @return: java.util.List<java.lang.String>
+     * @param mapper  映射函数
+     * @param scanJar 是否扫描 jar 包
+     * @return: java.util.List<R>
      * @description 从指定包下及其 jars 中扫描并返回所有的 class 文件的全限定名
-     * @date 2024/1/15 14:12
+     * @date 2024/1/17 17:00
      */
     public <R> List<R> findClass(Function<Resource, R> mapper, boolean scanJar) {
         basePackage = basePackage.replace(".", "/");
@@ -59,10 +61,13 @@ public class ResourceResolver {
     }
 
     /**
-     * @param parent 父路径 uri
+     * @param parent    父路径
+     * @param mapper    映射函数
+     * @param clazzList 结果集合
+     * @param scanJar   是否扫描 jar 包
      * @return: void
      * @description 扫描包路径下、jar包下的 class 文件并添加到结果集合
-     * @date 2024/1/15 15:58
+     * @date 2024/1/17 16:59
      */
     private <R> void scanClass(String parent, Function<Resource, R> mapper, ArrayList<R> clazzList, boolean scanJar) throws IOException {
         parent = removeSuffixSlash(parent);

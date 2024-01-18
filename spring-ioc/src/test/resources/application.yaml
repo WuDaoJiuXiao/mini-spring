@@ -1,0 +1,21 @@
+server:
+  name:
+    prefix: Mini
+    suffix: Spring
+  port: 8888
+mini:
+  framework:
+    type: program
+    language: java
+    name:
+      deep:
+        file: application.yml
+  year:
+    length: 365
+    month: 12
+    isLeap: false
+    content:
+      - spring
+      - summer
+      - autumn
+      - winter
