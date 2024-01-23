@@ -19,3 +19,17 @@ mini:
       - summer
       - autumn
       - winter
+convert:
+  byte: -121
+  short: 485
+  int: 789456
+  long: 7800000000
+  float: 0.458
+  double: -78.5421
+  boolean: false
+  localDate: 2024-01-22
+  localTime: 23:08:07
+  localDateTime: 2024-01-22T23:08:07
+  zonedDateTime: 2024-01-22T23:08:07+08:00[Asia/Shanghai]
+  duration: P2DT3H4M
+  zoneId: Asia/Shanghai
