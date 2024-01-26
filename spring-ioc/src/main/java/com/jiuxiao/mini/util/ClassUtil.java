@@ -58,7 +58,6 @@ public class ClassUtil {
     public static <A extends Annotation> A getAnnotation(Annotation[] annotations, Class<A> annotationClass) {
         for (Annotation annotation : annotations) {
             if (annotationClass.isInstance(annotation)) {
-
                 return (A) (annotation);
             }
         }
@@ -73,6 +72,9 @@ public class ClassUtil {
      */
     public static String getBeanName(Method method) {
         Bean bean = method.getAnnotation(Bean.class);
+        if (bean == null) {
+            return null;
+        }
         String name = bean.value();
         if (name.isEmpty()) {
             name = method.getName();
