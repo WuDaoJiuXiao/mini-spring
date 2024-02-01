@@ -51,11 +51,13 @@ public class ResourceResolver {
                 URL url = resources.nextElement();
                 URI uri = url.toURI();
                 String uriStr = removeSuffixSlash(uri2String(uri));
-                String parentUri = uriStr.substring(0, uriStr.length() - basePackage.length());
-                if (parentUri.startsWith("file:")) {
-                    parentUri = parentUri.substring(6);
-                    scanClass(parentUri, mapper, clazzList, scanJar);
+
+//                String parentUri = uriStr.substring(0, uriStr.length() - basePackage.length());
+                if (uriStr.startsWith("file:")) {
+                    uriStr = uriStr.substring(6);
+                    scanClass(uriStr, mapper, clazzList, scanJar);
                 }
+
             }
             return clazzList;
         } catch (IOException ioe) {
@@ -86,7 +88,8 @@ public class ResourceResolver {
             // 收集扫描结果，创建资源对象
             if (suffixName.equals("class")) {
                 String filePath = "file:" + absPath;
-                String fileName = absPath.substring(finalParent.length() + 1);
+                String clazzName = absPath.substring(finalParent.length() + 1);
+                String fileName = (dot2Slash(basePackage) + "/" + clazzName).replace("/", "\\");
                 Resource resource = new Resource(fileName, filePath);
                 logger.debug("Find class object " + resource);
                 R r = mapper.apply(resource);
@@ -156,6 +159,17 @@ public class ResourceResolver {
     private String slash2Dot(String s) {
         s = s.replace("\\", ".");
         s = s.replace("/", ".");
+        return s;
+    }
+
+    /**
+     * @param s 源文件路径
+     * @return: java.lang.String
+     * @description 将文件路径中的点替换为斜杠
+     * @date 2024/1/15 17:03
+     */
+    private String dot2Slash(String s) {
+        s = s.replace(".", "\\");
         return s;
     }
 

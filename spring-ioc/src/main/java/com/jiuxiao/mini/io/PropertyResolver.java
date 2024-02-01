@@ -100,7 +100,7 @@ public class PropertyResolver {
      */
     public <T> T getProperty(String key, Class<T> target, T defaultValue) {
         String value = getProperty(key);
-        if (value == null){
+        if (value == null) {
             return defaultValue;
         }
         return convert(target, key);
@@ -167,6 +167,7 @@ public class PropertyResolver {
      * @date 2024/1/17 17:07
      */
     private PropertyExpression parsePropertyExpression(String expression) {
+        if (expression == null || expression.isEmpty()) return null;
         if (expression.startsWith("${") && expression.endsWith("}")) {
             int index = expression.indexOf(":");
             if (index == -1) {

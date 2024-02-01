@@ -8,11 +8,10 @@ import java.util.List;
 
 public class ResourceResolverTest {
 
-    ResourceResolver resourceResolver = new ResourceResolver("com.jiuxiao.mini");
-
     @Test
     public void testFindClass() {
         boolean scanJar = true;
+        ResourceResolver resourceResolver = new ResourceResolver("com.jiuxiao");
         List<String> pathList = new ArrayList<>(), nameList = new ArrayList<>();
         List<Resource> clazzList = resourceResolver.findClass(resource -> resource, scanJar);
         clazzList.forEach(resource -> {
@@ -36,5 +35,14 @@ public class ResourceResolverTest {
         Assert.assertTrue(nameList.contains("oracle\\jrockit\\jfr\\parser\\RandomAccessFileFLRInput.class"));
         Assert.assertTrue(nameList.contains("oracle\\jrockit\\jfr\\parser\\BufferLostEvent.class"));
         Assert.assertTrue(nameList.contains("oracle\\jrockit\\jfr\\tools\\ConCatRepository.class"));
+    }
+
+    @Test
+    public void testFindClassInSomePackage() {
+        ResourceResolver resolver = new ResourceResolver("com.jiuxiao.mini.annotation");
+        List<Resource> resourceList = resolver.findClass(resource -> resource, false);
+        for (Resource resource : resourceList) {
+            System.out.println(resource.getName());
+        }
     }
 }
