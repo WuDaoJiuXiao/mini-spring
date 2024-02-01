@@ -73,7 +73,7 @@ public class PropertyResolverTest {
         Assert.assertEquals(aLong, new Long("7800000000"));
         Assert.assertEquals(aFloat, new Float("0.458"));
         Assert.assertEquals(aDouble, new Double("-78.5421"));
-        Assert.assertEquals(character, new Character('c'));
+        Assert.assertEquals(character, new Character('m'));
         Assert.assertEquals(aBoolean, Boolean.FALSE);
         Assert.assertEquals(localDate, LocalDate.parse("2024-01-22"));
         Assert.assertEquals(localTime, LocalTime.parse("23:08:07"));

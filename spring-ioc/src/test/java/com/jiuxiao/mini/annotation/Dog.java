@@ -6,6 +6,5 @@ package com.jiuxiao.mini.annotation;
  * @Description
  */
 @Animal
-@CrawlAnimal
 public class Dog {
 }

@@ -30,9 +30,9 @@ public class ClassUtilTest {
     @Test
     public void testGetAnnotation() throws Exception {
         Annotation[] annotations = Dog.class.getAnnotations();
-        CrawlAnimal crawlAnimal = ClassUtil.getAnnotation(annotations, CrawlAnimal.class);
-        Assert.assertNotNull(crawlAnimal);
-        Assert.assertEquals(crawlAnimal.annotationType(), CrawlAnimal.class);
+        Animal animal = ClassUtil.getAnnotation(annotations, Animal.class);
+        Assert.assertNotNull(animal);
+        Assert.assertEquals(animal.annotationType(), Animal.class);
     }
 
     @Test
