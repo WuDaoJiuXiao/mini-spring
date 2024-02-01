@@ -8,6 +8,8 @@ import com.jiuxiao.mini.util.ClassUtil;
 import jakarta.annotation.Nullable;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.*;
@@ -20,6 +22,8 @@ import java.util.stream.Collectors;
  * @Description 使用注解配置生成上下文
  */
 public class AnnoConfigApplicationContext implements ConfigApplicationContext {
+
+    private final Logger logger = LoggerFactory.getLogger(AnnoConfigApplicationContext.class);
 
     /* 属性解析器 */
     protected final PropertyResolver propertyResolver;
@@ -45,13 +49,11 @@ public class AnnoConfigApplicationContext implements ConfigApplicationContext {
         this.creatBeanNameSet = new HashSet<>();
 
         // 创建 @Configuration 类型的 Bean
-        List<String> configurationList = this.beans.values().stream()
-                .filter(this::isConfigurationBean).sorted()
+        this.beans.values().stream().filter(this::isConfigurationBean).sorted()
                 .map(beanDefinition -> {
                     createBeanAsEarlySingleton(beanDefinition);
                     return beanDefinition.getName();
                 }).collect(Collectors.toList());
-        this.creatBeanNameSet.addAll(configurationList);
 
         // 创建 BeanPostProcessor 类型的 bean
         List<BeanPostProcessor> processorBeanList = this.beans.values().stream()
@@ -68,6 +70,10 @@ public class AnnoConfigApplicationContext implements ConfigApplicationContext {
 
         // 使用 init 方法初始化 bean
         this.beans.values().forEach(this::initBean);
+
+        this.beans.values().stream().sorted().forEach(def -> {
+            logger.debug("Bean initialized {}", def);
+        });
     }
 
     /**
@@ -77,8 +83,7 @@ public class AnnoConfigApplicationContext implements ConfigApplicationContext {
      */
     private void createNormalBeans() {
         List<BeanDefinition> collected = this.beans.values().stream()
-                .filter(beanDefinition -> beanDefinition.getInstance() == null).sorted()
-                .collect(Collectors.toList());
+                .filter(def -> def.getInstance() == null).sorted().collect(Collectors.toList());
         collected.forEach(beanDefinition -> {
             // 某 bean 没有被创建，需要创建
             if (beanDefinition.getInstance() == null) {
@@ -178,7 +183,7 @@ public class AnnoConfigApplicationContext implements ConfigApplicationContext {
      */
     @Override
     public List<BeanDefinition> findBeanDefinitions(Class<?> type) {
-        return beans.values().stream()
+        return this.beans.values().stream()
                 .filter(beanDefinition -> type.isAssignableFrom(beanDefinition.getBeanClass()))
                 .sorted().collect(Collectors.toList());
     }
@@ -341,7 +346,7 @@ public class AnnoConfigApplicationContext implements ConfigApplicationContext {
                 if (dependBean != null) {
                     Object beanInstance = dependBean.getInstance();
                     // 当前依赖的 bean 尚未进行初始化，递归调用进行初始化
-                    if (beanInstance != null) {
+                    if (beanInstance == null) {
                         beanInstance = createBeanAsEarlySingleton(dependBean);
                     }
                     objectArgs[i] = beanInstance;
@@ -415,11 +420,18 @@ public class AnnoConfigApplicationContext implements ConfigApplicationContext {
      */
     private void initBean(BeanDefinition beanDefinition) {
         final Object beanInstance = getProxiedInstance(beanDefinition);
-        callInitMethod(beanInstance, beanDefinition.getInitMethod(), beanDefinition.getInitMethodName());
+        callMethod(beanInstance, beanDefinition.getInitMethod(), beanDefinition.getInitMethodName());
         // 调用 BeanPostProcessor.postProcessAfterInitialization()
         beanPostProcessorList.forEach(beanPostProcessor -> {
-            Object processor = beanPostProcessor.postProcessAfterInitialization(beanDefinition.getInstance(), beanDefinition.getName());
-            beanDefinition.setInstance(processor);
+            Object processorInstance = beanPostProcessor.postProcessAfterInitialization(beanDefinition.getInstance(), beanDefinition.getName());
+            if (processorInstance != beanDefinition.getInstance()) {
+                assert beanDefinition.getInstance() != null;
+                logger.debug("BeanPostProcessor {} return different bean from {} to {}",
+                        beanPostProcessor.getClass().getSimpleName(),
+                        beanDefinition.getInstance().getClass().getName(),
+                        processorInstance.getClass().getName());
+                beanDefinition.setInstance(processorInstance);
+            }
         });
     }
 
@@ -438,31 +450,39 @@ public class AnnoConfigApplicationContext implements ConfigApplicationContext {
             Object postedInstance = beanPostProcessor.postProcessOnSetProperty(instance, beanDefinition.getName());
             if (postedInstance != instance) {
                 instance = postedInstance;
+                logger.debug("BeanPostProcessor {} specified inject from {} to {}",
+                        beanPostProcessor.getClass().getSimpleName(), instance.getClass().getSimpleName(), postedInstance.getClass().getSimpleName());
             }
         }
         return instance;
     }
 
     /**
-     * @param beanInstance   bean实例
-     * @param initMethod     初始化方法
-     * @param initMethodName 初始化方法名
+     * @param beanInstance bean实例
+     * @param method       调用的方法
+     * @param methodName   调用的方法名
      * @return: void
-     * @description 调用初始化方法
+     * @description 调用 Bean 的初始化或者销毁方法
      * @date 2024/1/23 14:25
      */
-    private void callInitMethod(Object beanInstance, Method initMethod, String initMethodName) {
-        if (initMethod != null) {
+    private void callMethod(Object beanInstance, Method method, String methodName) {
+        // 调用 [@PostConstruct 注解的初始化方法] 或者 [@PerDestroy 注解的销毁方法]
+        if (method != null) {
             try {
-                initMethod.invoke(beanInstance);
+                method.invoke(beanInstance);
+                logger.info("Bean {} invoked method {} by @PostConstruct or @PerDestroy",
+                        beanInstance.getClass().getName(), method.getName());
             } catch (ReflectiveOperationException e) {
                 throw new BeanCreationException(e);
             }
-        } else if (initMethodName != null) {
-            Method namedMethod = ClassUtil.getNamedMethod(beanInstance.getClass(), initMethodName);
+        } else if (methodName != null) {
+            // 调用 [@Bean(initMethod = "xxx") 注解的初始化方法] 或者 [@Bean(destroyMethod = "xxx") 注解的销毁方法]
+            Method namedMethod = ClassUtil.getNamedMethod(beanInstance.getClass(), methodName);
             namedMethod.setAccessible(true);
             try {
                 namedMethod.invoke(beanInstance);
+                logger.info("Bean {} invoked method {} by @Bean(initMethod = 'xxx') or @Bean(destroyMethod = 'xxx')",
+                        beanInstance.getClass().getName(), methodName);
             } catch (ReflectiveOperationException e) {
                 throw new BeanCreationException(e);
             }
@@ -517,6 +537,7 @@ public class AnnoConfigApplicationContext implements ConfigApplicationContext {
             checkFieldOrMethod(accField);
             accField.setAccessible(true);
             field = accField;
+            logger.debug("Field {} injected of BeanDefinition {}", accField.getName(), beanDef.getName());
         }
         // 方法使用 setter 注入时必须有且仅有一个参数
         if (acc instanceof Method) {
@@ -530,6 +551,7 @@ public class AnnoConfigApplicationContext implements ConfigApplicationContext {
             }
             accMethod.setAccessible(true);
             method = accMethod;
+            logger.debug("Method {} injected of BeanDefinition {} by setter", accMethod.getName(), beanDef.getName());
         }
 
         // 只能使用一种方法进行注入
@@ -553,9 +575,11 @@ public class AnnoConfigApplicationContext implements ConfigApplicationContext {
             Object property = propertyResolver.getRequiredProperty(value.value(), accessibleType);
             if (field != null) {
                 field.set(beanInstance, property);
+                logger.debug("Field {} injected value {} by @Value", field.getName(), value.value());
             }
             if (method != null) {
                 method.invoke(beanInstance, property);
+                logger.debug("Method {} injected value {} by @Value", method.getName(), value.value());
             }
         }
 
@@ -573,9 +597,11 @@ public class AnnoConfigApplicationContext implements ConfigApplicationContext {
             if (depends != null) {
                 if (field != null) {
                     field.set(beanInstance, depends);
+                    logger.debug("Field {} injected value {} by @Autowired", field.getName(), autowired.value());
                 }
                 if (method != null) {
                     method.invoke(beanInstance, depends);
+                    logger.debug("Method {} injected value {} by @Autowired", method.getName(), autowired.value());
                 }
             }
         }
@@ -703,32 +729,33 @@ public class AnnoConfigApplicationContext implements ConfigApplicationContext {
                 if (Modifier.isPrivate(modifiers)) {
                     throw new BeanCreationException(String.format("@Component class %s must be not private.", clazz.getName()));
                 }
-            }
 
-            // 正式创建 BeanDefinition
-            String beanName = ClassUtil.getBeanName(clazz);
-            BeanDefinition beanDefinition = new BeanDefinition(
-                    beanName,
-                    clazz,
-                    getSuitableConstructor(clazz),
-                    getOrder(clazz),
-                    clazz.isAnnotationPresent(Primary.class),
-                    null,
-                    null,
-                    ClassUtil.findAnnotationMethod(clazz, PostConstruct.class),
-                    ClassUtil.findAnnotationMethod(clazz, PreDestroy.class)
-            );
-            // 将创建的 BeanDefinition 添加到结果集合中
-            addBeanDefinition(definitionHashMap, beanDefinition);
+                // 正式创建 BeanDefinition
+                String beanName = ClassUtil.getBeanName(clazz);
+                BeanDefinition beanDefinition = new BeanDefinition(
+                        beanName,
+                        clazz,
+                        getSuitableConstructor(clazz),
+                        getOrder(clazz),
+                        clazz.isAnnotationPresent(Primary.class),
+                        null,
+                        null,
+                        ClassUtil.findAnnotationMethod(clazz, PostConstruct.class),
+                        ClassUtil.findAnnotationMethod(clazz, PreDestroy.class)
+                );
+                logger.debug("Create BeanDefinition success {}", beanDefinition);
+                // 将创建的 BeanDefinition 添加到结果集合中
+                addBeanDefinition(definitionHashMap, beanDefinition);
 
-            // 如果有 @Configuration 注解，表示使用工厂方法创建 BeanDefinition
-            Configuration configuration = ClassUtil.findAllAnnotation(clazz, Configuration.class);
-            if (configuration != null) {
-                if (BeanPostProcessor.class.isAssignableFrom(clazz)) {
-                    throw new BeanDefinitionException(String.format("@Configuration class %s cannot be BeanPostProcessor.", clazz.getName()));
+                // 如果有 @Configuration 注解，表示使用工厂方法创建 BeanDefinition
+                Configuration configuration = ClassUtil.findAllAnnotation(clazz, Configuration.class);
+                if (configuration != null) {
+                    if (BeanPostProcessor.class.isAssignableFrom(clazz)) {
+                        throw new BeanDefinitionException(String.format("@Configuration class %s cannot be BeanPostProcessor.", clazz.getName()));
+                    }
+                    // 扫描 @Configuration 注解所标注的类的工厂方法，创建后添加到结果集合中
+                    scanFactoryMethods(beanName, clazz, definitionHashMap);
                 }
-                // 扫描 @Configuration 注解所标注的类的工厂方法，创建后添加到结果集合中
-                scanFactoryMethods(beanName, clazz, definitionHashMap);
             }
         }
         return definitionHashMap;
@@ -830,6 +857,7 @@ public class AnnoConfigApplicationContext implements ConfigApplicationContext {
                         bean.initMethod().isEmpty() ? null : bean.initMethod(),
                         bean.destroyMethod().isEmpty() ? null : bean.destroyMethod(),
                         null, null);
+                logger.debug("Create BeanDefinition {} by factory {} success", beanDefinition, bean.initMethod());
                 addBeanDefinition(definitionHashMap, beanDefinition);
             }
         }
@@ -847,7 +875,7 @@ public class AnnoConfigApplicationContext implements ConfigApplicationContext {
                 ? new String[]{clazz.getPackage().getName()}
                 : componentScan.value();
         HashSet<String> classNameSet = new HashSet<>();
-        boolean scanJar = true;
+        boolean scanJar = false;
 
         // 扫描 @ComponentScan 注解中指定的所有包，包括 jar 包之下的所有 class 文件，添加到最终结果集合中
         for (String scanPackage : scanPackages) {
@@ -855,7 +883,9 @@ public class AnnoConfigApplicationContext implements ConfigApplicationContext {
             List<String> clazzList = resolver.findClass(resource -> {
                 String name = resource.getName();
                 if (name.endsWith(".class")) {
-                    return name.substring(0, name.length() - 6).replace("\\", ".").replace("/", ".");
+                    String res = name.substring(0, name.length() - 6).replace("\\", ".").replace("/", ".");
+                    logger.debug("Find bean {} by @ComponentScan in package {}", res, scanPackage);
+                    return res;
                 }
                 return null;
             }, scanJar);
@@ -867,6 +897,7 @@ public class AnnoConfigApplicationContext implements ConfigApplicationContext {
         if (anImport != null) {
             for (Class<?> aClass : anImport.value()) {
                 String name = aClass.getName();
+                logger.debug("Find bean {} by @Import", name);
                 classNameSet.add(name);
             }
         }
@@ -882,10 +913,12 @@ public class AnnoConfigApplicationContext implements ConfigApplicationContext {
     public void close() {
         beans.values().forEach(beanDefinition -> {
             final Object instance = getProxiedInstance(beanDefinition);
-            callInitMethod(instance, beanDefinition.getDestroyMethod(), beanDefinition.getDestroyMethodName());
+            callMethod(instance, beanDefinition.getDestroyMethod(), beanDefinition.getDestroyMethodName());
+            logger.info("Closed bean {} and destroyed", instance.getClass().getSimpleName());
         });
         beans.clear();
         ApplicationContextUtil.setApplicationContext(null);
+        logger.info("ApplicationContext has cleared and all destroyed");
     }
 
     /**

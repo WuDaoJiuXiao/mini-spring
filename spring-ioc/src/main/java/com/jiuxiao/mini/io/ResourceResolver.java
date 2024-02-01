@@ -1,5 +1,8 @@
 package com.jiuxiao.mini.io;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.io.UnsupportedEncodingException;
@@ -23,6 +26,8 @@ import java.util.jar.JarFile;
  * @Description 资源解析器，模拟 @ComponentScan 注解
  */
 public class ResourceResolver {
+
+    private final Logger logger = LoggerFactory.getLogger(ResourceResolver.class);
 
     private String basePackage;
 
@@ -79,27 +84,23 @@ public class ResourceResolver {
             String[] split = absPath.split("\\.");
             String suffixName = split[split.length - 1];
             // 收集扫描结果，创建资源对象
-            // Class.forName() 加载时，类的全限定名 filePath 不需要传最后的 .class 字段
             if (suffixName.equals("class")) {
-                String pkgSlashName = absPath.substring(finalParent.length() + 1);
-                String pkgDotName = slash2Dot(pkgSlashName);
-                String filePath = pkgDotName.substring(0, pkgDotName.length() - 6);
-                String fileName = filePath.substring(filePath.lastIndexOf(".") + 1);
+                String filePath = "file:" + absPath;
+                String fileName = absPath.substring(finalParent.length() + 1);
                 Resource resource = new Resource(fileName, filePath);
+                logger.debug("Find class object " + resource);
                 R r = mapper.apply(resource);
                 if (r != null) {
                     clazzList.add(r);
                 }
             } else if (suffixName.equals("jar") && scanJar) {
-                List<String> jarClass;
+                List<Resource> jarClass;
                 try {
                     jarClass = readJarFileForClass(absPath);
                 } catch (IOException e) {
                     throw new RuntimeException(e);
                 }
-                jarClass.forEach(clazzPath -> {
-                    String clazzName = clazzPath.substring(clazzPath.lastIndexOf(".") + 1);
-                    Resource resource = new Resource(clazzName, clazzPath);
+                jarClass.forEach(resource -> {
                     R r = mapper.apply(resource);
                     if (r != null) {
                         clazzList.add(r);
@@ -111,20 +112,22 @@ public class ResourceResolver {
 
     /**
      * @param absPath jar包路径
-     * @return: java.util.List<java.lang.String>
+     * @return: java.util.List<com.jiuxiao.mini.io.Resource>
      * @description 读取 jar 包中的 class 文件，收集全限定名
      * @date 2024/1/16 14:20
      */
-    private List<String> readJarFileForClass(String absPath) throws IOException {
+    private List<Resource> readJarFileForClass(String absPath) throws IOException {
         JarFile jarFile;
-        List<String> resClass = new ArrayList<>();
+        List<Resource> resClass = new ArrayList<>();
         jarFile = new JarFile(absPath);
         jarFile.stream().forEach(res -> {
             String resAbsPath = res.toString();
             if (resAbsPath.endsWith(".class")) {
-                String doted = slash2Dot(resAbsPath);
-                String filePath = doted.substring(0, doted.length() - 6);
-                resClass.add(filePath);
+                String filePath = "file:" + absPath + "!" + resAbsPath.replace("/", "\\");
+                String fileName = resAbsPath.replace("/", "\\");
+                Resource resource = new Resource(fileName, filePath);
+                resClass.add(resource);
+                logger.debug("Find class object of {} in {}", resource, absPath.substring(absPath.lastIndexOf("\\") + 1));
             }
         });
         jarFile.close();

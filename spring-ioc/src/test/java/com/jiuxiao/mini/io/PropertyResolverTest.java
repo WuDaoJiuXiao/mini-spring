@@ -1,10 +1,12 @@
 package com.jiuxiao.mini.io;
 
+import com.jiuxiao.mini.util.YamlUtil;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
 import java.time.*;
+import java.util.Map;
 import java.util.Properties;
 
 
@@ -16,22 +18,12 @@ public class PropertyResolverTest {
 
     @Before
     public void setUp() {
+        String contextPath = "./application.yaml";
         properties = new Properties();
-        properties.put("app.title", "mini");
-        properties.put("convert.byte", "-121");
-        properties.put("convert.short", "485");
-        properties.put("convert.int", "789456");
-        properties.put("convert.long", "7800000000");
-        properties.put("convert.float", "0.458");
-        properties.put("convert.double", "-78.5421");
-        properties.put("convert.char", "c");
-        properties.put("convert.boolean", "false");
-        properties.put("convert.localDate", "2024-01-22");
-        properties.put("convert.localTime", "23:08:07");
-        properties.put("convert.localDateTime", "2024-01-22T23:08:07");
-        properties.put("convert.zonedDateTime", "2024-01-22T23:08:07+08:00[Asia/Shanghai]");
-        properties.put("convert.duration", "P2DT3H4M");
-        properties.put("convert.zoneId", "Asia/Shanghai");
+        Map<String, Object> plainMap = YamlUtil.loadYamlAsPlainMap(contextPath);
+        for (String key : plainMap.keySet()) {
+            properties.put(key, plainMap.get(key));
+        }
         propertyResolver = new PropertyResolver(properties);
     }
 

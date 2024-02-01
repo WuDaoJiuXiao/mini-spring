@@ -1,17 +1,14 @@
 package com.jiuxiao.mini.io;
 
-import jdk.jfr.events.X509ValidationEvent;
-import oracle.jrockit.jfr.Recording;
 import org.junit.Assert;
 import org.junit.Test;
 
-import java.beans.EventHandler;
 import java.util.ArrayList;
 import java.util.List;
 
 public class ResourceResolverTest {
 
-    ResourceResolver resourceResolver = new ResourceResolver("com.jiuxiao");
+    ResourceResolver resourceResolver = new ResourceResolver("com.jiuxiao.mini");
 
     @Test
     public void testFindClass() {
@@ -23,9 +20,9 @@ public class ResourceResolverTest {
             nameList.add(resource.getName());
         });
         String[] templates = {
-                "com.jiuxiao.mini.scan.ScanBean",
-                "com.jiuxiao.mini.scan.inner.ScanInnerBean",
-                "com.jiuxiao.mini.scan.inner.sub.ScanInnerSubBean",
+                "file:E:\\MyCode\\project\\mini-spring\\spring-ioc\\target\\test-classes\\com\\jiuxiao\\mini\\scan\\inner\\sub\\ScanInnerSubBean.class",
+                "file:E:\\MyCode\\project\\mini-spring\\spring-ioc\\target\\test-classes\\com\\jiuxiao\\mini\\scan\\inner\\ScanInnerBean.class",
+                "file:E:\\MyCode\\project\\mini-spring\\spring-ioc\\target\\test-classes\\com\\jiuxiao\\mini\\scan\\ScanBean.class"
         };
 
         // 非 jar 包之下的 class
@@ -34,9 +31,10 @@ public class ResourceResolverTest {
         }
 
         // jar 包之中的 class
-        Assert.assertTrue(nameList.contains(Process.class.getSimpleName()));
-        Assert.assertTrue(nameList.contains(Recording.class.getSimpleName()));
-        Assert.assertTrue(nameList.contains(X509ValidationEvent.class.getSimpleName()));
-        Assert.assertTrue(nameList.contains(EventHandler.class.getSimpleName()));
+        Assert.assertTrue(nameList.contains("jdk\\jfr\\events\\X509ValidationEvent.class"));
+        Assert.assertTrue(nameList.contains("jdk\\jfr\\events\\ErrorThrownEvent.class"));
+        Assert.assertTrue(nameList.contains("oracle\\jrockit\\jfr\\parser\\RandomAccessFileFLRInput.class"));
+        Assert.assertTrue(nameList.contains("oracle\\jrockit\\jfr\\parser\\BufferLostEvent.class"));
+        Assert.assertTrue(nameList.contains("oracle\\jrockit\\jfr\\tools\\ConCatRepository.class"));
     }
 }

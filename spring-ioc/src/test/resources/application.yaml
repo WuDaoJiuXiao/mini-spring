@@ -3,6 +3,7 @@ server:
     prefix: Mini
     suffix: Spring
   port: 8888
+  area: Asia
 mini:
   framework:
     type: program
@@ -10,15 +11,6 @@ mini:
     name:
       deep:
         file: application.yml
-  year:
-    length: 365
-    month: 12
-    isLeap: false
-    content:
-      - spring
-      - summer
-      - autumn
-      - winter
 convert:
   byte: -121
   short: 485
@@ -27,9 +19,14 @@ convert:
   float: 0.458
   double: -78.5421
   boolean: false
+  char: m
+  string: hello
   localDate: 2024-01-22
   localTime: 23:08:07
   localDateTime: 2024-01-22T23:08:07
   zonedDateTime: 2024-01-22T23:08:07+08:00[Asia/Shanghai]
   duration: P2DT3H4M
   zoneId: Asia/Shanghai
+app:
+  title: mini
+  version: v1.0

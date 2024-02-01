@@ -1,12 +1,11 @@
 package com.jiuxiao.mini.io;
 
 import jakarta.annotation.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.*;
-import java.util.HashMap;
-import java.util.Objects;
-import java.util.Properties;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Function;
 
 /**
@@ -20,11 +19,14 @@ public class PropertyResolver {
 
     private final HashMap<Class<?>, Function<String, Object>> convertMap = new HashMap<>();
 
+    private final Logger logger = LoggerFactory.getLogger(ResourceResolver.class);
+
     public PropertyResolver(Properties properties) {
         propertiesMap.putAll(System.getenv());
         Set<String> propertyNames = properties.stringPropertyNames();
         propertyNames.forEach(name -> {
             propertiesMap.put(name, properties.getProperty(name));
+            logger.debug("Set properties in map of {{}:{}}", name, properties.getProperty(name));
         });
         registryConverts();
     }
