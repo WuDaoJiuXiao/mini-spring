@@ -1,6 +1,5 @@
 package com.jiuxiao.mini.around;
 
-import com.jiuxiao.mini.anno.NamedCat;
 import com.jiuxiao.mini.annotation.Around;
 import com.jiuxiao.mini.annotation.Component;
 import com.jiuxiao.mini.annotation.Value;

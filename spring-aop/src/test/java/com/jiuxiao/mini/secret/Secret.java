@@ -1,4 +1,4 @@
-package com.jiuxiao.mini.anno;
+package com.jiuxiao.mini.secret;
 
 import java.lang.annotation.*;
 
@@ -6,7 +6,7 @@ import java.lang.annotation.*;
 @Documented
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ ElementType.TYPE, ElementType.METHOD })
-public @interface Metric {
+public @interface Secret {
 
     String value();
 }

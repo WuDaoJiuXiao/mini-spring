@@ -1,6 +1,5 @@
 package com.jiuxiao.mini.around;
 
-import com.jiuxiao.mini.anno.NamedCat;
 import com.jiuxiao.mini.annotation.Component;
 
 import java.lang.reflect.InvocationHandler;
