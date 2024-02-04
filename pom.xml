@@ -21,6 +21,7 @@
     <modules>
         <module>spring-ioc</module>
         <module>spring-aop</module>
+        <module>spring-jdbc</module>
     </modules>
 
     <properties>
@@ -137,13 +138,6 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
-    <dependencies>
-        <dependency>
-            <groupId>util</groupId>
-            <artifactId>util</artifactId>
-            <version>0.1.0-SNAPSHOT</version>
-        </dependency>
-    </dependencies>
 
     <build>
         <resources>
