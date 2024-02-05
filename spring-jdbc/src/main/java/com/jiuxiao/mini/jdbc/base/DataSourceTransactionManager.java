@@ -35,7 +35,7 @@ public class DataSourceTransactionManager implements PlatformTransactionManager,
     public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
         TransactionStatus status = transactionStatus.get();
         if (status == null) {
-            Connection connection;
+            Connection connection = null;
             try {
                 connection = dataSource.getConnection();
                 final boolean autoCommit = connection.getAutoCommit();
@@ -64,6 +64,10 @@ public class DataSourceTransactionManager implements PlatformTransactionManager,
                 }
             } catch (Exception e) {
                 throw new DataAccessException(e);
+            }finally {
+                transactionStatus.remove();
+                assert connection != null;
+                connection.close();
             }
         } else {
             return method.invoke(proxy, args);

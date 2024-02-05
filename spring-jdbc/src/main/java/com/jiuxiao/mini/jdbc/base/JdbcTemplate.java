@@ -32,7 +32,7 @@ public class JdbcTemplate {
      * @description 查询数值对象
      * @date 2024/2/2 14:23
      */
-    public Number queryNumber(String sql, Object... args) throws DataAccessException {
+    public Number queryNumber(String sql, Object... args) throws DataAccessException, SQLException {
         return queryObject(sql, NumberRowMapper.numberRowMapper, args);
     }
 
@@ -45,7 +45,7 @@ public class JdbcTemplate {
      * @date 2024/2/2 14:26
      */
     @SuppressWarnings("unchecked")
-    public <T> T queryObject(String sql, Class<T> clazz, Object... args) throws DataAccessException {
+    public <T> T queryObject(String sql, Class<T> clazz, Object... args) throws DataAccessException, SQLException {
         if (clazz == String.class) {
             return ((T) queryObject(sql, StringRowMapper.stringRowMapper, args));
         }
@@ -66,7 +66,7 @@ public class JdbcTemplate {
      * @description 查询指定对象
      * @date 2024/2/2 14:33
      */
-    public <T> T queryObject(String sql, RowMapper<T> rowMapper, Object... args) throws DataAccessException {
+    public <T> T queryObject(String sql, RowMapper<T> rowMapper, Object... args) throws DataAccessException, SQLException {
         return execute(preparedStatementCreator(sql, args), (PreparedStatement preparedStatement) -> {
             T res = null;
             try (ResultSet resultSet = preparedStatement.executeQuery()) {
@@ -93,7 +93,7 @@ public class JdbcTemplate {
      * @description 查询指定集合
      * @date 2024/2/2 14:40
      */
-    public <T> List<T> queryList(String sql, Class<T> clazz, Object... args) throws DataAccessException {
+    public <T> List<T> queryList(String sql, Class<T> clazz, Object... args) throws DataAccessException, SQLException {
         return queryList(sql, new BeanRowMapper<>(clazz), args);
     }
 
@@ -105,7 +105,7 @@ public class JdbcTemplate {
      * @description 查询指定集合
      * @date 2024/2/2 15:54
      */
-    public <T> List<T> queryList(String sql, RowMapper<T> rowMapper, Object... args) throws DataAccessException {
+    public <T> List<T> queryList(String sql, RowMapper<T> rowMapper, Object... args) throws DataAccessException, SQLException {
         return execute(preparedStatementCreator(sql, args), (PreparedStatement preparedStatement) -> {
             ArrayList<T> list = new ArrayList<>();
             try (ResultSet resultSet = preparedStatement.executeQuery()) {
@@ -124,7 +124,7 @@ public class JdbcTemplate {
      * @description 更新并返回参数 key
      * @date 2024/2/2 15:50
      */
-    public Number updateAndReturnGenerateKey(String sql, Object... args) throws DataAccessException {
+    public Number updateAndReturnGenerateKey(String sql, Object... args) throws DataAccessException, SQLException {
         return execute(
                 (Connection connection) -> {
                     PreparedStatement preparedStatement = connection.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS);
@@ -152,12 +152,11 @@ public class JdbcTemplate {
     /**
      * @param sql  要执行的 sql 语句
      * @param args 携带的参数
-     * @return: int
      * @description 更新操作
      * @date 2024/2/2 15:42
      */
-    public int update(String sql, Object... args) throws DataAccessException {
-        return execute(preparedStatementCreator(sql, args), PreparedStatement::executeUpdate);
+    public void update(String sql, Object... args) throws DataAccessException, SQLException {
+        execute(preparedStatementCreator(sql, args), PreparedStatement::executeUpdate);
     }
 
     /**
@@ -167,7 +166,7 @@ public class JdbcTemplate {
      * @description 执行 sql 语句
      * @date 2024/2/2 15:40
      */
-    public <T> T execute(PreparedStatementCreator preparedStatement, PreparedStatementCallback<T> callback) {
+    public <T> T execute(PreparedStatementCreator preparedStatement, PreparedStatementCallback<T> callback) throws SQLException {
         return execute((Connection connect) -> {
             try (PreparedStatement prepared = preparedStatement.createPreparedStatement(connect)) {
                 return callback.doInPreparedStatement(prepared);
@@ -181,7 +180,7 @@ public class JdbcTemplate {
      * @description 执行 sql 语句
      * @date 2024/2/2 15:30
      */
-    public <T> T execute(ConnectCallback<T> connectCallback) throws DataAccessException {
+    public <T> T execute(ConnectCallback<T> connectCallback) throws DataAccessException, SQLException {
         Connection currentConnection = TransactionUtil.getCurrentConnection();
         if (currentConnection != null) {
             try {
@@ -191,7 +190,7 @@ public class JdbcTemplate {
             }
         }
         // 获取新连接
-        Connection connection;
+        Connection connection = null;
         try {
             connection = dataSource.getConnection();
             final boolean autoCommit = connection.getAutoCommit();
@@ -205,6 +204,9 @@ public class JdbcTemplate {
             return result;
         } catch (SQLException e) {
             throw new DataAccessException(e);
+        } finally {
+            assert connection != null;
+            connection.close();
         }
     }
 
